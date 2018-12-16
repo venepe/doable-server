@@ -31,6 +31,25 @@ exports.up = (pgm) => {
 
   pgm.createIndex({schema: 'doable', name: 'deck'}, 'description');
 
+  pgm.createTable({schema: 'doable', name: 'user_deck'}, {
+    id: 'id',
+    user_id: {
+      type: 'integer',
+      notNull: true,
+      references: 'doable.user',
+    },
+    deck_id: {
+      type: 'integer',
+      notNull: true,
+      references: 'doable.deck',
+    },
+    created_at: {
+     type: 'timestamp',
+     notNull: true,
+     default: pgm.func('current_timestamp')
+    }
+  });
+
   pgm.createTable({schema: 'doable', name: 'audiocard'}, {
     id: 'id',
     question_text: { type: 'varchar' },

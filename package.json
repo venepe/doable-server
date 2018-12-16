@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@babel/runtime": "7.0.0-beta.55",
+    "@google-cloud/storage": "^2.3.3",
     "@google-cloud/text-to-speech": "^0.4.0",
     "@material-ui/core": "^3.0.1",
     "@material-ui/icons": "^2.0.3",
@@ -28,6 +29,7 @@
     "axios": "^0.18.0",
     "body-parser": "^1.18.3",
     "compression": "^1.7.2",
+    "del": "^3.0.0",
     "dotenv": "^6.0.0",
     "express": "^4.16.3",
     "formik": "^1.0.2",

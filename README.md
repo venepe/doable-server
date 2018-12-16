@@ -12,7 +12,7 @@ yarn dev
 
 ### Mutations
 
-#### Create Dealership
+#### Create Auidocard
 ```
 mutation($generateAudiocardInput:GenerateAudiocardInput!) {
   generateAudiocard(input:$generateAudiocardInput) {
@@ -107,6 +107,21 @@ query {
       questionAudioUri
       answerText
       answerAudioUri
+      createdAt
+    }
+  }
+}
+```
+
+#### All Decks
+```
+query {
+  allDecks {
+    nodes {
+      nodeId
+      id
+      title
+      description
       createdAt
     }
   }

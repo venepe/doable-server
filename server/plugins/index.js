@@ -4,11 +4,28 @@ const {
 } = require('graphile-utils');
 import fs from 'fs';
 import uuidv1 from 'uuid/v1';
+import path from 'path';
+import del from 'del';
 import textToSpeech from '@google-cloud/text-to-speech';
+import googleStorage, { Storage } from '@google-cloud/storage';
+const CLOUD_BUCKET = 'doable-audio';
+const AUDIO_DIR = path.join(__dirname, '../../', 'audio');
+const SECRETS_DIR = path.join(__dirname, '../../', 'secrets');
+console.log(AUDIO_DIR);
 const client = new textToSpeech.TextToSpeechClient({
   projectId: 'doable',
-  keyFilename: '/Users/apple/dev/doable/server/postgraphile-demo/secrets/Doable-sa.json',
+  keyFilename: `${SECRETS_DIR}/doable-text-to-speech-sa.json`,
 });
+
+const storage = new Storage({
+  projectId: 'doable',
+  keyFilename: `${SECRETS_DIR}/doable-storage-sa.json`,
+});
+const bucket = storage.bucket(CLOUD_BUCKET);
+
+function getPublicUrl (filename) {
+  return `https://storage.googleapis.com/${CLOUD_BUCKET}/${filename}`;
+}
 
 export const GenerateAudiocardMutationPlugin =
 makeExtendSchemaPlugin(build => {
@@ -124,7 +141,7 @@ const saveTextToSpeech = (text) => {
 
     // Write the binary audio content to a local file
     const uuid = uuidv1();
-    const uri = `/Users/apple/dev/doable/server/postgraphile-demo/audio/${uuid}.mp3`;
+    const uri = `${AUDIO_DIR}/${uuid}.mp3`;
     fs.writeFile(uri, response.audioContent, 'binary', err => {
       if (err) {
         console.error('ERROR:', err);
@@ -132,7 +149,20 @@ const saveTextToSpeech = (text) => {
         return;
       }
       console.log('Audio content written to file: output.mp3');
-      resolve({ uri });
+      storage.bucket(CLOUD_BUCKET).upload(uri, {
+        metadata: {
+          cacheControl: 'public, max-age=31536000',
+        },
+        predefinedAcl: 'publicRead',
+      })
+      .then(() => {
+        del(uri);
+        resolve({ uri: getPublicUrl(`${uuid}.mp3`) });
+      })
+      .catch((err) => {
+        console.log(err);
+        reject();
+      });
     });
   });
   });
