@@ -3,9 +3,6 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import webpack from 'webpack';
 import invariant from 'invariant';
-import webpackDevMiddleware from 'webpack-dev-middleware';
-import webpackHotMiddleware from 'webpack-hot-middleware';
-import webpackDevConfig from '../webpack/webpack.dev.babel';
 import {
   logAudioSession,
   logInteractiveSession,
@@ -16,16 +13,26 @@ const { postgraphile } = require('postgraphile');
 import {
   GenerateAudiocardMutationPlugin,
 } from './plugins';
-const PORT = 3000;
-const DIST_DIR = path.resolve(__dirname, '..', 'public');
+const config = require('../config');
+const PORT = config.get('PORT');
+const useGraphiql = process.env.NODE_ENV === 'production' ? true : true;
 
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
+const options = {
+  user: config.get('POSTGRES_USER'),
+  password: config.get('POSTGRES_PASSWORD'),
+  host: config.get('POSTGRES_HOST'),
   database: 'postgres',
-  password: 'supersecretpswd',
   port: 5432,
-});
+};
+
+if (
+  config.get('INSTANCE_CONNECTION_NAME') &&
+  config.get('NODE_ENV') === 'production'
+) {
+  options.host = `/cloudsql/${config.get('INSTANCE_CONNECTION_NAME')}`;
+}
+
+const pool = new Pool(options);
 
 const app = express();
 
@@ -57,7 +64,7 @@ app.post('/audio-sessions',(req, res) => {
 
 //GraphQL Api
 app.use(postgraphile(pool, 'doable', {
-    graphiql: true,
+    graphiql: useGraphiql,
     appendPlugins: [
       GenerateAudiocardMutationPlugin,
     ],

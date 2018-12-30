@@ -1,0 +1,6 @@
+runtime: nodejs10
+
+instance_class: F2
+
+env_variables:
+  POSTGRES_HOST: "35.224.70.228"

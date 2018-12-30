@@ -9,18 +9,10 @@ import del from 'del';
 import textToSpeech from '@google-cloud/text-to-speech';
 import googleStorage, { Storage } from '@google-cloud/storage';
 const CLOUD_BUCKET = 'doable-audio';
-const AUDIO_DIR = path.join(__dirname, '../../', 'audio');
 const SECRETS_DIR = path.join(__dirname, '../../', 'secrets');
-console.log(AUDIO_DIR);
-const client = new textToSpeech.TextToSpeechClient({
-  projectId: 'doable',
-  keyFilename: `${SECRETS_DIR}/doable-text-to-speech-sa.json`,
-});
+const client = new textToSpeech.TextToSpeechClient();
 
-const storage = new Storage({
-  projectId: 'doable',
-  keyFilename: `${SECRETS_DIR}/doable-storage-sa.json`,
-});
+const storage = new Storage();
 const bucket = storage.bucket(CLOUD_BUCKET);
 
 function getPublicUrl (filename) {
@@ -138,32 +130,28 @@ const saveTextToSpeech = (text) => {
       reject();
       return;
     }
-
-    // Write the binary audio content to a local file
-    const uuid = uuidv1();
-    const uri = `${AUDIO_DIR}/${uuid}.mp3`;
-    fs.writeFile(uri, response.audioContent, 'binary', err => {
-      if (err) {
-        console.error('ERROR:', err);
-        reject();
-        return;
-      }
-      console.log('Audio content written to file: output.mp3');
-      storage.bucket(CLOUD_BUCKET).upload(uri, {
+      const uuid = uuidv1();
+      const uri = `${uuid}.mp3`;
+      const blob = bucket.file(uri);
+      const blobStream = blob.createWriteStream({
+        resumable: false,
         metadata: {
           cacheControl: 'public, max-age=31536000',
+          contentType: 'audio/mpeg',
         },
         predefinedAcl: 'publicRead',
-      })
-      .then(() => {
-        del(uri);
-        resolve({ uri: getPublicUrl(`${uuid}.mp3`) });
-      })
-      .catch((err) => {
+      });
+
+      blobStream.on('error', err => {
         console.log(err);
         reject();
       });
+
+      blobStream.on('finish', () => {
+        resolve({ uri: getPublicUrl(uri) });
+      });
+
+      blobStream.end(response.audioContent);
     });
-  });
   });
 }

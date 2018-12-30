@@ -14,18 +14,16 @@
     ]
   ],
   "plugins": [
-    "transform-object-rest-spread"
+    "transform-object-rest-spread",
+    ["transform-runtime", {
+      "polyfill": false,
+      "regenerator": true
+    }]
   ],
   "env": {
     "production": {
       "only": [
-        "src",
         "server"
-      ],
-      "plugins": [
-        "transform-react-remove-prop-types",
-        "transform-react-inline-elements",
-        "transform-react-constant-elements"
       ]
     }
   }

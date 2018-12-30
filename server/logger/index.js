@@ -9,7 +9,6 @@ export const logSearchText = ({pool, text}) => {
 }
 
 export const logInteractiveSession = ({pool, uid, userId = null, audiocardId, deckId, response, isCorrect}) => {
-  console.log(uid, audiocardId, deckId, response, isCorrect);
   pool.query(statements.INSERT_INTERATIVE_SESSION, [uid, userId, audiocardId, deckId, response, isCorrect]);
 }
 
