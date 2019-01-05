@@ -7,6 +7,7 @@ import uuidv1 from 'uuid/v1';
 import path from 'path';
 import del from 'del';
 import textToSpeech from '@google-cloud/text-to-speech';
+import { Translate } from '@google-cloud/translate';
 import googleStorage, { Storage } from '@google-cloud/storage';
 const CLOUD_BUCKET = 'doable-audio';
 const SECRETS_DIR = path.join(__dirname, '../../', 'secrets');
@@ -14,6 +15,7 @@ const client = new textToSpeech.TextToSpeechClient();
 
 const storage = new Storage();
 const bucket = storage.bucket(CLOUD_BUCKET);
+const translate = new Translate();
 
 function getPublicUrl (filename) {
   return `https://storage.googleapis.com/${CLOUD_BUCKET}/${filename}`;
@@ -54,8 +56,12 @@ makeExtendSchemaPlugin(build => {
           await pgClient.query('SAVEPOINT graphql_mutation');
           try {
             // Get the product values
+            console.log('begin_translate_detect');
+            const languageCodes = await Promise.all([getLanguageCode(question_text), getLanguageCode(answer_text)]);
+            console.log('end_translate_detect');
+
             console.log('begin_text_to_speech');
-            const results = await Promise.all([saveTextToSpeech(question_text), saveTextToSpeech(answer_text)]);
+            const results = await Promise.all([saveTextToSpeech({ text: question_text, languageCode: languageCodes[0] }), saveTextToSpeech({ text: answer_text, languageCode: languageCodes[1] })]);
             const question_audio_uri = results[0].uri;
             const answer_audio_uri = results[1].uri;
 
@@ -113,13 +119,32 @@ makeExtendSchemaPlugin(build => {
   };
 });
 
-const saveTextToSpeech = (text) => {
+const getLanguageCode = (text) => {
+  return new Promise((resolve, reject) => {
+    translate.detect(text)
+      .then((data) => {
+        const result = data[0] || {};
+        const { language } = result;
+        if (language.substring(0, 2) === 'en') {
+          resolve('en-US');
+        } else {
+          resolve(language);
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+        reject(err);
+      })
+  });
+}
+
+const saveTextToSpeech = ({ text, languageCode }) => {
   return new Promise((resolve, reject) => {
 
     // Construct the request
     const request = {
       input: { text },
-      voice: { languageCode: 'en-US', ssmlGender: 'NEUTRAL' },
+      voice: { languageCode, ssmlGender: 'NEUTRAL' },
       audioConfig: { audioEncoding: 'MP3' },
     };
 
