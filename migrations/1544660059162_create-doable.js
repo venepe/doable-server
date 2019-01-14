@@ -50,41 +50,48 @@ exports.up = (pgm) => {
     }
   });
 
-  pgm.createTable({schema: 'doable', name: 'audiocard'}, {
+  pgm.createTable({schema: 'doable', name: 'document'}, {
     id: 'id',
-    question_text: { type: 'varchar' },
-    question_audio_uri: { type: 'varchar' },
-    answer_text: { type: 'varchar' },
-    answer_audio_uri: { type: 'varchar' },
-    created_at: {
-      type: 'timestamp',
-      notNull: true,
-      default: pgm.func('current_timestamp')
-    }
-  });
-
-  pgm.createTable({schema: 'doable', name: 'deck_audiocard'}, {
-    id: 'id',
-    audiocard_id: {
+    user_id: {
       type: 'integer',
       notNull: true,
-      references: 'doable.audiocard',
+      references: 'doable.user',
     },
     deck_id: {
       type: 'integer',
       notNull: true,
       references: 'doable.deck',
     },
+    original_uri: { type: 'varchar' },
+    image_uri: { type: 'varchar' },
+    text: { type: 'varchar' },
     created_at: {
      type: 'timestamp',
      notNull: true,
      default: pgm.func('current_timestamp')
     }
+ });
+
+  pgm.createTable({schema: 'doable', name: 'card'}, {
+    id: 'id',
+    document_id: {
+      type: 'integer',
+      notNull: true,
+      references: 'doable.document',
+    },
+    deck_id: {
+      type: 'integer',
+      notNull: true,
+      references: 'doable.deck',
+    },
+    front_text: { type: 'varchar' },
+    back_text: { type: 'varchar' },
+    created_at: {
+      type: 'timestamp',
+      notNull: true,
+      default: pgm.func('current_timestamp')
+    }
   });
-
-  pgm.createIndex({schema: 'doable', name: 'deck_audiocard'}, 'audiocard_id');
-
-  pgm.createIndex({schema: 'doable', name: 'deck_audiocard'}, 'deck_id');
 
   pgm.createFunction(
     {schema: 'doable', name: 'search_decks'},

@@ -4,15 +4,10 @@ import bodyParser from 'body-parser';
 import webpack from 'webpack';
 import invariant from 'invariant';
 import {
-  logAudioSession,
-  logInteractiveSession,
   logSearchText,
 } from './logger';
 const { Pool } = require('pg');
 const { postgraphile } = require('postgraphile');
-import {
-  GenerateAudiocardMutationPlugin,
-} from './plugins';
 const config = require('../config');
 const PORT = config.get('PORT');
 const useGraphiql = process.env.NODE_ENV === 'production' ? true : true;
@@ -48,25 +43,10 @@ app.use('/graphql', (req, res, next) => {
   next();
 });
 
-app.post('/interactive-sessions',(req, res) => {
-  const { interactiveSession } = req.body || {};
-  const { uid, userId = null, audiocardId, deckId, response, isCorrect } = interactiveSession;
-  logInteractiveSession({ pool, uid, userId, audiocardId, deckId, response, isCorrect });
-  res.json({status: 'ok'})
-});
-
-app.post('/audio-sessions',(req, res) => {
-  const { audioSession } = req.body;
-  const { uid, userId = null, audiocardId, deckId } = audioSession;
-  logAudioSession({ pool, uid, userId, audiocardId, deckId });
-  res.json({status: 'ok'})
-});
-
 //GraphQL Api
 app.use(postgraphile(pool, 'doable', {
     graphiql: useGraphiql,
     appendPlugins: [
-      GenerateAudiocardMutationPlugin,
     ],
   }));
 

@@ -12,25 +12,6 @@ yarn dev
 
 ### Mutations
 
-#### Create Auidocard
-```
-mutation($generateAudiocardInput:GenerateAudiocardInput!) {
-  generateAudiocard(input:$generateAudiocardInput) {
-    audiocard {
-      questionText
-      questionAudioUri
-      answerText
-      answerAudioUri
-    }
-  }
-}
-{
-  "generateAudiocardInput": {
-    "questionText": "What is the capital of France",
-    "answerText": "Paris"
-  }
-}
-```
 
 #### Create Deck
 ```
@@ -70,24 +51,24 @@ mutation($createDeckInput:CreateDeckInput!) {
 }
 ```
 
-#### Create DeckAudiocard
+#### Create DeckCard
 ```
-mutation($createDeckAudiocardInput:CreateDeckAudiocardInput!) {
-  createDeckAudiocard(input:$createDeckAudiocardInput) {
-    deckAudiocard {
+mutation($createDeckCardInput:CreateDeckCardInput!) {
+  createDeckCard(input:$createDeckCardInput) {
+    deckCard {
       deckId
-      audiocardByAudiocardId {
-        answerAudioUri
-        questionAudioUri
+      cardByCardId {
+        frontText
+        backText
       }
     }
   }
 }
 {
-  "createDeckAudiocardInput": {
-    "deckAudiocard": {
+  "createDeckCardInput": {
+    "deckCard": {
       "deckId": 1,
-      "audiocardId": 3
+      "cardId": 3
     }
   }
 }
@@ -96,17 +77,15 @@ mutation($createDeckAudiocardInput:CreateDeckAudiocardInput!) {
 
 ### Query
 
-#### All Audiocards
+#### All Cards
 ```
 query {
-  allAudiocards {
+  allCards {
     nodes {
       nodeId
       id
-      questionText
-      questionAudioUri
-      answerText
-      answerAudioUri
+      frontText
+      backText
       createdAt
     }
   }
