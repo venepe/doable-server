@@ -13,20 +13,19 @@ yarn dev
 ### Mutations
 
 
-#### Create Deck
+#### Create User
 ```
-mutation($createDeckInput:CreateDeckInput!) {
-  createDeck(input:$createDeckInput) {
-    deck {
-      title
-      description
+mutation($createUserInput:CreateUserInput!) {
+  createUser(input:$createUserInput) {
+    user {
+      id
     }
   }
 }
 {
-  "createDeckInput": {
-    "deck": {
-      "title": "World Capitals"
+  "createUserInput": {
+    "user": {
+      "email": "vernon@doable.com"
     }
   }
 }
@@ -46,6 +45,26 @@ mutation($createDeckInput:CreateDeckInput!) {
   "createDeckInput": {
     "deck": {
       "title": "World Capitals"
+    }
+  }
+}
+```
+
+#### Create Document
+```
+mutation($createDocumentInput:CreateDocumentInput!) {
+  createDocument(input:$createDocumentInput) {
+    document {
+      id
+    }
+  }
+}
+{
+  "createDocumentInput": {
+    "document": {
+      "userId": 1,
+      "originalUri": "http://test.com",
+      "deckId": 1
     }
   }
 }
@@ -53,22 +72,22 @@ mutation($createDeckInput:CreateDeckInput!) {
 
 #### Create DeckCard
 ```
-mutation($createDeckCardInput:CreateDeckCardInput!) {
-  createDeckCard(input:$createDeckCardInput) {
-    deckCard {
+mutation($createCardInput:CreateCardInput!) {
+  createCard(input:$createCardInput) {
+    card {
       deckId
-      cardByCardId {
-        frontText
-        backText
-      }
+      frontText
+      backText
     }
   }
 }
 {
-  "createDeckCardInput": {
-    "deckCard": {
+  "createCardInput": {
+    "card": {
       "deckId": 1,
-      "cardId": 3
+      "frontText": "What is the capital of the US",
+      "backText": "Washington, D.C.",
+      "documentId": 1
     }
   }
 }
