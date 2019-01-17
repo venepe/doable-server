@@ -3,6 +3,8 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import webpack from 'webpack';
 import invariant from 'invariant';
+import { resolveUpload } from './lib';
+import Document from './lib/document';
 import {
   logSearchText,
 } from './logger';
@@ -49,6 +51,27 @@ app.use(postgraphile(pool, 'doable', {
     appendPlugins: [
     ],
   }));
+
+app.post('/document',
+Document.multer.single('document'),
+Document.sendUploadToGCS,
+(req, res) => {
+  let { deckId, userId } = req.body;
+
+  // Was an image uploaded? If so, we'll use its public URL
+  // in cloud storage.
+  if (req.file && req.file.cloudStoragePublicUrl) {
+    const imageUri = req.file.cloudStoragePublicUrl;
+    const text = req.textDetection;
+    const insert = 'INSERT INTO doable.document(user_id, deck_id, image_uri, text) VALUES($1, $2, $3, $4) RETURNING *';
+
+    pool.query({ text: insert, values: [ userId, deckId, imageUri, text ] })
+      .then((result) => {
+        res.json({ document: result.rows[0]});
+      })
+      .catch(e => console.error(e.stack))
+  }
+});
 
 const server = app.listen(PORT, (error) => {
   invariant(!error, 'Something failed: ', error);

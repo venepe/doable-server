@@ -18,6 +18,11 @@ exports.up = (pgm) => {
 
   pgm.createTable({schema: 'doable', name: 'deck'}, {
     id: 'id',
+    user_id: {
+      type: 'integer',
+      notNull: true,
+      references: 'doable.user',
+    },
     title: { type: 'varchar' },
     description: { type: 'varchar' },
     created_at: {
@@ -31,25 +36,6 @@ exports.up = (pgm) => {
 
   pgm.createIndex({schema: 'doable', name: 'deck'}, 'description');
 
-  pgm.createTable({schema: 'doable', name: 'user_deck'}, {
-    id: 'id',
-    user_id: {
-      type: 'integer',
-      notNull: true,
-      references: 'doable.user',
-    },
-    deck_id: {
-      type: 'integer',
-      notNull: true,
-      references: 'doable.deck',
-    },
-    created_at: {
-     type: 'timestamp',
-     notNull: true,
-     default: pgm.func('current_timestamp')
-    }
-  });
-
   pgm.createTable({schema: 'doable', name: 'document'}, {
     id: 'id',
     user_id: {
@@ -62,7 +48,6 @@ exports.up = (pgm) => {
       notNull: true,
       references: 'doable.deck',
     },
-    original_uri: { type: 'varchar' },
     image_uri: { type: 'varchar' },
     text: { type: 'varchar' },
     created_at: {

@@ -44,7 +44,8 @@ mutation($createDeckInput:CreateDeckInput!) {
 {
   "createDeckInput": {
     "deck": {
-      "title": "World Capitals"
+      "title": "World Capitals",
+      "userId": 1
     }
   }
 }
@@ -63,7 +64,7 @@ mutation($createDocumentInput:CreateDocumentInput!) {
   "createDocumentInput": {
     "document": {
       "userId": 1,
-      "originalUri": "http://test.com",
+      "imageUri": "http://test.com",
       "deckId": 1
     }
   }

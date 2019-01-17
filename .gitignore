@@ -11,4 +11,4 @@ db-data
 
 secrets
 config.json
-lib
+/lib
