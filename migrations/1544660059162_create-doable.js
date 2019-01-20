@@ -17,12 +17,14 @@ exports.up = (pgm) => {
 
   pgm.createIndex({schema: 'doable', name: 'user'}, 'email');
 
+  pgm.createIndex({schema: 'doable', name: 'user'}, 'uid');
+
   pgm.createTable({schema: 'doable', name: 'deck'}, {
     id: 'id',
-    user_id: {
-      type: 'integer',
+    user_uid: {
+      type: 'varchar',
       notNull: true,
-      references: 'doable.user',
+      references: 'doable.user (uid)',
     },
     title: { type: 'varchar' },
     description: { type: 'varchar' },
@@ -39,10 +41,10 @@ exports.up = (pgm) => {
 
   pgm.createTable({schema: 'doable', name: 'document'}, {
     id: 'id',
-    user_id: {
-      type: 'integer',
+    user_uid: {
+      type: 'varchar',
       notNull: true,
-      references: 'doable.user',
+      references: 'doable.user (uid)',
     },
     deck_id: {
       type: 'integer',
