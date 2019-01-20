@@ -6,7 +6,8 @@ exports.up = (pgm) => {
 
   pgm.createTable({schema: 'doable', name: 'user'}, {
     id: 'id',
-    email: { type: 'varchar' },
+    uid: { type: 'varchar', unique: true , notNull: true },
+    email: { type: 'varchar', notNull: true },
     created_at: {
      type: 'timestamp',
      notNull: true,
@@ -83,6 +84,13 @@ exports.up = (pgm) => {
     [{name: 'search', type: 'text'}],
     {returns: 'setof doable.deck', language: 'sql', behavior: 'stable'},
     " select deck.* from doable.deck as deck where deck.title ilike ('%' || search || '%') or deck.description ilike ('%' || search || '%') group by deck.id "
+  );
+
+  pgm.createFunction(
+    {schema: 'doable', name: 'logon_user'},
+    [{name: 'uid', type: 'text'}, {name: 'email', type: 'text'}],
+    {returns: 'doable.user', language: 'sql', behavior: 'volatile'},
+    " insert into doable.user (uid, email) values (uid, email) ON CONFLICT (uid) DO UPDATE SET uid = EXCLUDED.uid RETURNING *"
   );
 
 };
