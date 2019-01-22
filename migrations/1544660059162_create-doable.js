@@ -12,7 +12,12 @@ exports.up = (pgm) => {
      type: 'timestamp',
      notNull: true,
      default: pgm.func('current_timestamp')
-    }
+   },
+   is_archived: {
+     type: 'boolean',
+     notNull: true,
+     default: false,
+   },
  });
 
   pgm.createIndex({schema: 'doable', name: 'user'}, 'email');
@@ -32,7 +37,12 @@ exports.up = (pgm) => {
      type: 'timestamp',
      notNull: true,
      default: pgm.func('current_timestamp')
-    }
+   },
+   is_archived: {
+     type: 'boolean',
+     notNull: true,
+     default: false,
+   },
  });
 
   pgm.createIndex({schema: 'doable', name: 'deck'}, 'title');
@@ -57,7 +67,12 @@ exports.up = (pgm) => {
      type: 'timestamp',
      notNull: true,
      default: pgm.func('current_timestamp')
-    }
+   },
+   is_archived: {
+     type: 'boolean',
+     notNull: true,
+     default: false,
+   },
  });
 
   pgm.createTable({schema: 'doable', name: 'card'}, {
@@ -78,7 +93,12 @@ exports.up = (pgm) => {
       type: 'timestamp',
       notNull: true,
       default: pgm.func('current_timestamp')
-    }
+    },
+    is_archived: {
+      type: 'boolean',
+      notNull: true,
+      default: false,
+    },
   });
 
   pgm.createFunction(

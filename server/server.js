@@ -12,6 +12,7 @@ import {
 } from './logger';
 const { Pool } = require('pg');
 const { postgraphile } = require('postgraphile');
+const PgOmitArchived = require('@graphile-contrib/pg-omit-archived');
 const config = require('../config');
 const PORT = config.get('PORT');
 const SECRETS_DIR = path.join(__dirname, '../', 'secrets');
@@ -56,7 +57,11 @@ app.use('/graphql',
 app.use(postgraphile(pool, 'doable', {
     graphiql: useGraphiql,
     appendPlugins: [
+      PgOmitArchived
     ],
+    graphileBuildOptions: {
+      pgArchivedColumnName: 'is_archived',
+    },
   }));
 
 app.post('/document',
