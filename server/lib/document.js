@@ -72,7 +72,10 @@ function textDetection(filename) {
     .then(([result]) => {
       const fullTextAnnotation = result.fullTextAnnotation;
       console.log(`Full text: ${fullTextAnnotation.text}`);
-      return fullTextAnnotation.text;
+      let text = fullTextAnnotation.text.replace(/\s/g, ' ');
+
+      console.log(text);
+      return text;
     });
 }
 

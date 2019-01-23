@@ -28,7 +28,7 @@ nconf
 
     // This is the id of your project in the Google Cloud Developers Console.
     GCLOUD_PROJECT: 'doable',
-    CLOUD_BUCKET: 'doable-audio',
+    CLOUD_BUCKET: 'doable-learning',
 
     POSTGRES_USER: '',
     POSTGRES_PASSWORD: '',

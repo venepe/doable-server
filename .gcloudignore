@@ -19,5 +19,6 @@ db-data
 # Node.js dependencies:
 node_modules/
 
-secrets
+secrets/doable-storage-sa.json
+
 package-lock.json

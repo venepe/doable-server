@@ -5,7 +5,6 @@ import bodyParser from 'body-parser';
 import webpack from 'webpack';
 import invariant from 'invariant';
 import jwt from 'express-jwt';
-import { resolveUpload } from './lib';
 import Document from './lib/document';
 import {
   logSearchText,
