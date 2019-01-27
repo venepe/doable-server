@@ -71,7 +71,7 @@ Document.sendUploadToGCS,
 
   // Was an image uploaded? If so, we'll use its public URL
   // in cloud storage.
-  if (req.file && req.file.cloudStoragePublicUrl) {
+  if (!req.objectDetection && req.file && req.file.cloudStoragePublicUrl) {
     const imageUri = req.file.cloudStoragePublicUrl;
     const text = req.textDetection;
     const insert = 'INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES($1, $2, $3, $4) RETURNING *';
@@ -81,6 +81,23 @@ Document.sendUploadToGCS,
         res.json({ document: result.rows[0]});
       })
       .catch(e => console.error(e.stack))
+  } else {
+    let message = `No Text. Just a ${req.objectDetection}.`;
+    res.status(400).json({
+      message,
+    });
+  }
+});
+
+app.use( (err, req, res, next) => {
+  console.log(err.stack);
+  if (req.objectDetection) {
+    let message = `No Text. Just a ${req.objectDetection}.`;
+    res.status(400).json({
+      message,
+    });
+  } else {
+    res.status(500).send();
   }
 });
 

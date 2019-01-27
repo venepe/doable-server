@@ -5,6 +5,9 @@ import Vision from '@google-cloud/vision';
 const config = require('../../config');
 const CLOUD_BUCKET = config.get('CLOUD_BUCKET');
 const SECRETS_DIR = path.join(__dirname, '../../', 'secrets');
+const ERROR_REASON = {
+  NO_TEXT_DETECTED: 'NO_TEXT_DETECTED',
+};
 
 const storage = new Storage({
   projectId: 'doable',
@@ -33,7 +36,6 @@ function sendUploadToGCS (req, res, next) {
   if (!req.file) {
     return next();
   }
-  console.log('file');
   const { buffer, originalname, mimetype } = req.file;
   const gcsname = Date.now() + originalname;
   const file = bucket.file(gcsname);
@@ -53,12 +55,17 @@ function sendUploadToGCS (req, res, next) {
   });
 
   stream.on('finish', () => {
-    console.log('start');
     textDetection(gcsname).then((textDetection) => {
       req.file.cloudStorageObject = gcsname;
       req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
       req.textDetection = textDetection;
       next();
+    })
+    .catch((err) => {
+      objectDetection(gcsname).then((objectDetection) => {
+        req.objectDetection = objectDetection;
+        next(err);
+      });
     });
   });
 
@@ -71,12 +78,26 @@ function textDetection(filename) {
   return vision.documentTextDetection(gsUri)
     .then(([result]) => {
       const fullTextAnnotation = result.fullTextAnnotation;
-      console.log(`Full text: ${fullTextAnnotation.text}`);
-      let text = fullTextAnnotation.text.replace(/\s/g, ' ');
-
-      console.log(text);
-      return text;
+      if (fullTextAnnotation && fullTextAnnotation.text && fullTextAnnotation.length > 0) {
+        let text = fullTextAnnotation.text.replace(/\s/g, ' ');
+        return text;
+      } else {
+        throw new Error(ERROR_REASON.NO_TEXT_DETECTED);
+      }
     });
+}
+
+function objectDetection(filename) {
+  const gsUri = `gs://${CLOUD_BUCKET}/${filename}`;
+  return vision.objectLocalization(gsUri)
+    .then(([result]) => {
+      let objectDetection = 'Mystery';
+      const objects = result.localizedObjectAnnotations;
+      if (objects && objects.length > 0) {
+        objectDetection = objects[0].name;
+      }
+      return objectDetection;
+    })
 }
 
 module.exports = {
