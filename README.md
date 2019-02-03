@@ -3,7 +3,7 @@
 ### Getting Started
 
 ```
-export DATABASE_URL=postgresql://postgres:supersecretpswd@localhost:5432/postgres
+export DATABASE_URL=postgresql://postgres:f4IPIg*3GIMz@35.224.70.228:5432/postgres
 docker-compose up
 yarn
 yarn migrate up
@@ -71,12 +71,12 @@ mutation($createDocumentInput:CreateDocumentInput!) {
 }
 ```
 
-#### Create DeckCard
+#### Create Card
 ```
 mutation($createCardInput:CreateCardInput!) {
   createCard(input:$createCardInput) {
     card {
-      deckId
+      id
       frontText
       backText
     }
@@ -85,15 +85,27 @@ mutation($createCardInput:CreateCardInput!) {
 {
   "createCardInput": {
     "card": {
-      "deckId": 1,
-      "frontText": "What is the capital of the US",
-      "backText": "Washington, D.C.",
-      "documentId": 1
+      "frontText": "Jackalope",
+      "backText": "A hopeful animal",
+      "deckId": 1
+      "frontTextIndexes": "[{\"documentId\":12,\"wordIndexes\":[0]}]",
+      "backTextIndexes": "[{\"documentId\":12,\"wordIndexes\":[3,4,5]}]",
     }
   }
 }
 ```
 
+
+
+#### Front And Back Text Indexes
+```
+[
+  {
+    documentId,
+    wordIndexes
+  }
+]
+```
 
 ### Query
 
@@ -125,4 +137,13 @@ query {
     }
   }
 }
+```
+
+### Deploying to Google Cloud
+```
+source ~/.bashrc
+```
+
+```
+gcloud app deploy app.yaml
 ```

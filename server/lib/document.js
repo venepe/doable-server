@@ -9,15 +9,9 @@ const ERROR_REASON = {
   NO_TEXT_DETECTED: 'NO_TEXT_DETECTED',
 };
 
-const storage = new Storage({
-  projectId: 'doable',
-  keyFilename: `${SECRETS_DIR}/doable-storage-sa.json`,
-});
+const storage = new Storage();
 
-const vision = new Vision.ImageAnnotatorClient({
-  projectId: 'doable',
-  keyFilename: `${SECRETS_DIR}/doable-storage-sa.json`,
-});
+const vision = new Vision.ImageAnnotatorClient();
 
 const bucket = storage.bucket(CLOUD_BUCKET);
 
@@ -78,7 +72,7 @@ function textDetection(filename) {
   return vision.documentTextDetection(gsUri)
     .then(([result]) => {
       const fullTextAnnotation = result.fullTextAnnotation;
-      if (fullTextAnnotation && fullTextAnnotation.text && fullTextAnnotation.length > 0) {
+      if (fullTextAnnotation && fullTextAnnotation.text) {
         let text = fullTextAnnotation.text.replace(/\s/g, ' ');
         return text;
       } else {
