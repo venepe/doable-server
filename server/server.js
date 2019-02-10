@@ -78,7 +78,16 @@ Document.sendUploadToGCS,
 
     pool.query({ text: insert, values: [ userUid, deckId, imageUri, text ] })
       .then((result) => {
-        res.json({ document: result.rows[0]});
+        const { id, user_uid, deck_id, image_uri, text, created_at } = result.rows[0];
+        const document = {
+          userUid: user_uid,
+          deckId: deck_id,
+          imageUri: image_uri,
+          createdAt: created_at,
+          text,
+          id,
+        };
+        res.json({ document });
       })
       .catch(e => console.error(e.stack))
   } else {
