@@ -15,6 +15,7 @@ nconf
     'CLOUD_BUCKET',
     'NODE_ENV',
     'PORT',
+    'CONVERT_API_SECRET',
   ])
   // 3. Config file
   .file({file: path.join(__dirname, 'config.json')})
@@ -35,6 +36,7 @@ nconf
     POSTGRES_HOST: 'localhost',
 
     PORT: 3000,
+    CONVERT_API_SECRET: '',
   });
 
 // Check for required settings
