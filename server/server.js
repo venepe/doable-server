@@ -64,63 +64,68 @@ app.use(postgraphile(pool, 'doable', {
     },
   }));
 
-  app.post('/deck',
-  Document.multer.single('document'),
-  Document.sendUploadToGCS,
-  (req, res) => {
-    let { userUid } = req.body;
+app.post('/deck', (req, res, next) => {
+  req.pool = pool;
+  next();
+});
 
-    // Was an image uploaded? If so, we'll use its public URL
-    // in cloud storage.
-    if (!req.objectDetection && req.file && req.file.cloudStoragePublicUrl) {
-      const title = req.file.originalname;
-      const imageUri = req.file.cloudStoragePublicUrl;
-      if (req.textDetections) {
-        const textDetections = req.textDetections;
-        const insert = 'INSERT INTO doable.deck(user_uid, title) VALUES($1, $2) RETURNING *';
-        let deck = {};
-        pool.query({ text: insert, values: [ userUid, title ] })
-          .then((result) => {
-            const { id, user_uid, title, created_at } = result.rows[0];
-            deck = {
+app.post('/deck',
+Document.multer.single('document'),
+Document.sendUploadToGCS,
+(req, res) => {
+  let { userUid } = req.body;
+
+  // Was an image uploaded? If so, we'll use its public URL
+  // in cloud storage.
+  if (!req.objectDetection && req.file && req.file.cloudStorageThumbnailPublicUrl) {
+    const title = req.file.originalname;
+    const imageUri = req.file.cloudStorageThumbnailPublicUrl;
+    if (req.textDetections) {
+      const textDetections = req.textDetections;
+      const insert = 'INSERT INTO doable.deck(user_uid, title) VALUES($1, $2) RETURNING *';
+      let deck = {};
+      pool.query({ text: insert, values: [ userUid, title ] })
+        .then((result) => {
+          const { id, user_uid, title, created_at } = result.rows[0];
+          deck = {
+            userUid: user_uid,
+            createdAt: created_at,
+            title,
+            id,
+          };
+          let formattedDocuments = [];
+          textDetections.forEach((text) => {
+            formattedDocuments.push([ userUid, deck.id, imageUri, text ]);
+          });
+          let query = format('INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES %L RETURNING *', formattedDocuments);
+          return pool.query(query)
+        })
+        .then((result) => {
+          let documents = [];
+          result.rows.forEach((row) => {
+            const { id, user_uid, deck_id, image_uri, text, created_at } = row;
+            const document = {
               userUid: user_uid,
+              deckId: deck_id,
+              imageUri: image_uri,
               createdAt: created_at,
-              title,
+              text,
               id,
             };
-            let formattedDocuments = [];
-            textDetections.forEach((text) => {
-              formattedDocuments.push([ userUid, deck.id, imageUri, text ]);
-            });
-            let query = format('INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES %L RETURNING *', formattedDocuments);
-            return pool.query(query)
-          })
-          .then((result) => {
-            let documents = [];
-            result.rows.forEach((row) => {
-              const { id, user_uid, deck_id, image_uri, text, created_at } = row;
-              const document = {
-                userUid: user_uid,
-                deckId: deck_id,
-                imageUri: image_uri,
-                createdAt: created_at,
-                text,
-                id,
-              };
-              documents.push(document);
-            });
-            // for now, just return deck
-            res.json({ deck });
-          })
-          .catch(e => console.error(e.stack));
-      }
-    } else {
-      let message = `No Text. Just a ${req.objectDetection}.`;
-      res.status(400).json({
-        message,
-      });
+            documents.push(document);
+          });
+          // for now, just return deck
+          res.json({ deck });
+        })
+        .catch(e => console.error(e.stack));
     }
-  });
+  } else {
+    let message = `No Text. Just a ${req.objectDetection}.`;
+    res.status(400).json({
+      message,
+    });
+  }
+});
 
 app.post('/document',
 Document.multer.single('document'),

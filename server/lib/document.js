@@ -4,6 +4,7 @@ import { Storage } from '@google-cloud/storage';
 import Vision from '@google-cloud/vision';
 import ConvertApi from 'convertapi';
 import request from 'request';
+import md5 from 'md5';
 const config = require('../../config');
 const CLOUD_BUCKET = config.get('CLOUD_BUCKET');
 const CONVERT_API_SECRET = config.get('CONVERT_API_SECRET');
@@ -33,86 +34,133 @@ const multer = Multer({
   },
 });
 
-function getPublicUrl (filename) {
+function getGCUri(filename) {
+  return `gs://${CLOUD_BUCKET}/${filename}`;
+}
+
+function getPublicUrl(filename) {
   return `https://storage.googleapis.com/${CLOUD_BUCKET}/${filename}`;
+}
+
+function insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri }) {
+  const insert = 'INSERT INTO chronicle.document(hash, pdf_uri, thumbnail_uri, ocr_uri) VALUES($1, $2, $3, $4) RETURNING *';
+  return pool.query({ text: insert, values: [ hash, pdfUri, thumbnailUri, ocrUri ] });
+}
+
+function selectHashFromChronicle({ pool, hash }) {
+  const select = 'SELECT * FROM chronicle.document WHERE hash = $1';
+  return pool.query({ text: select, values: [ hash ] });
 }
 
 function sendUploadToGCS (req, res, next) {
   if (!req.file) {
     return next();
   }
+  const pool = req.pool;
   const { buffer, originalname, mimetype } = req.file;
-  const gcsname = Date.now() + originalname;
-  const file = bucket.file(gcsname);
 
-  const stream = file.createWriteStream({
-    resumable: false,
-    metadata: {
-      cacheControl: 'public, max-age=31536000',
-      contentType: mimetype,
-    },
-    predefinedAcl: 'publicRead',
-  });
+  let hash = md5(buffer);
 
-  stream.on('error', (err) => {
-    req.file.cloudStorageError = err;
-    next(err);
-  });
-
-  stream.on('finish', () => {
-    if (mimetype.match('image.*')) {
-      textDetection(gcsname).then((textDetection) => {
-        req.file.cloudStorageObject = gcsname;
-        req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
-        req.textDetection = textDetection;
+  selectHashFromChronicle({ pool, hash }).then((result) => {
+    if (result && result.rows && result.rows.length > 0) {
+      const { pdf_uri, thumbnail_uri, ocr_uri } = result.rows[0];
+      req.file.cloudStoragePDFPublicUrl = getPublicUrl(pdf_uri);
+      req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(thumbnail_uri);
+      storage.bucket(CLOUD_BUCKET).file(ocr_uri).download()
+      .then((data) => { return data.toString('utf-8') })
+      .then((data) => { return JSON.parse(data) })
+      .then((data) => {
+        let textDetections = [];
+        data.responses.forEach(response => {
+          let text = response.fullTextAnnotation.text.replace(/\s/g, ' ');
+          textDetections.push(text)
+        });
+        req.textDetections = textDetections;
         next();
       })
-      .catch((err) => {
-        objectDetection(gcsname).then((objectDetection) => {
-          req.objectDetection = objectDetection;
-          next(err);
-        });
-      });
     } else {
-      convertDocumentToPDF(getPublicUrl(gcsname), originalname)
-        .then((gcsname) => {
-          req.file.cloudStorageObject = gcsname;
-          req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
-          return textPdfDetection(gcsname);
-        })
-        .then((prefix) => {
-          return storage.bucket(CLOUD_BUCKET).getFiles({ prefix: `${prefix}/` })
-        })
-        .then(([files]) => {
-          return storage.bucket(CLOUD_BUCKET).file(files[0].name).download()
-        })
-        .then((data) => { return data.toString('utf-8') })
-        .then((data) => { return JSON.parse(data) })
-        .then((data) => {
-          let textDetections = [];
-          data.responses.forEach(response => {
-            let text = response.fullTextAnnotation.text.replace(/\s/g, ' ');
-            textDetections.push(text)
-            console.log(text);
+      const gcsname = Date.now() + originalname;
+      const file = bucket.file(gcsname);
+
+      const stream = file.createWriteStream({
+        resumable: false,
+        metadata: {
+          cacheControl: 'public, max-age=31536000',
+          contentType: mimetype,
+        },
+        predefinedAcl: 'publicRead',
+      });
+
+      stream.on('error', (err) => {
+        req.file.cloudStorageError = err;
+        next(err);
+      });
+
+      stream.on('finish', () => {
+        if (mimetype.match('image.*')) {
+          textDetection(gcsname).then((textDetection) => {
+            req.file.cloudStorageObject = gcsname;
+            req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
+            req.textDetection = textDetection;
+            next();
+          })
+          .catch((err) => {
+            objectDetection(gcsname).then((objectDetection) => {
+              req.objectDetection = objectDetection;
+              next(err);
+            });
           });
-          req.textDetections = textDetections;
-        })
-        .then(() => {
-          let gcsname = req.file.cloudStorageObject;
-          return convertPDFToThumbnail(getPublicUrl(gcsname), originalname)
-        })
-        .then((gcsname) => {
-          req.file.cloudStorageObject = gcsname;
-          req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
-          next();
-        })
-        .catch((err) => {
-          next(err);
-        });
+        } else {
+          convertDocumentToPDF(getPublicUrl(gcsname), originalname)
+            .then((gcsname) => {
+              req.file.cloudStoragePDFObject = gcsname;
+              req.file.cloudStoragePDFPublicUrl = getPublicUrl(gcsname);
+              return textPdfDetection(gcsname);
+            })
+            .then((prefix) => {
+              return storage.bucket(CLOUD_BUCKET).getFiles({ prefix: `${prefix}/` })
+            })
+            .then(([files]) => {
+              req.file.cloudStorageOCRObject = files[0].name;
+              return storage.bucket(CLOUD_BUCKET).file(files[0].name).download()
+            })
+            .then((data) => { return data.toString('utf-8') })
+            .then((data) => { return JSON.parse(data) })
+            .then((data) => {
+              let textDetections = [];
+              data.responses.forEach(response => {
+                let text = response.fullTextAnnotation.text.replace(/\s/g, ' ');
+                textDetections.push(text)
+              });
+              req.textDetections = textDetections;
+            })
+            .then(() => {
+              let gcsname = req.file.cloudStoragePDFObject;
+              return convertPDFToThumbnail(getPublicUrl(gcsname), originalname)
+            })
+            .then((gcsname) => {
+              req.file.cloudStorageThumbnailObject = gcsname;
+              req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(gcsname);
+            })
+            .then(() => {
+              let pdfUri = req.file.cloudStoragePDFObject;
+              let thumbnailUri = req.file.cloudStorageThumbnailObject;
+              let ocrUri = req.file.cloudStorageOCRObject;
+              let gcsname = req.file.cloudStorageObject;
+              return insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri });
+            })
+            .then(() => {
+              next();
+            })
+            .catch((err) => {
+              next(err);
+            });
+        }
+      });
+
+      stream.end(buffer);
     }
   });
-
-  stream.end(buffer);
 }
 
 function convertDocumentToPDF(uri, originalName) {
@@ -186,7 +234,7 @@ function convertPDFToThumbnail(uri, originalName) {
 }
 
 function textDetection(filename) {
-  const gsUri = `gs://${CLOUD_BUCKET}/${filename}`;
+  const gsUri = getGCUri(filename);
   return vision.documentTextDetection(gsUri)
     .then(([result]) => {
       const fullTextAnnotation = result.fullTextAnnotation;
@@ -202,7 +250,7 @@ function textDetection(filename) {
 async function textPdfDetection(filename) {
   console.log('textDetection: ' + filename);
   let prefix = filename.replace(/\.[^/.]+$/, '');
-  const gcsSourceUri = `gs://${CLOUD_BUCKET}/${filename}`;
+  const gcsSourceUri = getGCUri(filename);
   const gcsDestinationUri = `gs://${CLOUD_BUCKET}/${prefix}/`;
 
   const inputConfig = {
@@ -240,7 +288,7 @@ async function textPdfDetection(filename) {
 }
 
 function objectDetection(filename) {
-  const gsUri = `gs://${CLOUD_BUCKET}/${filename}`;
+  const gsUri = getGCUri(filename);
   return vision.objectLocalization(gsUri)
     .then(([result]) => {
       let objectDetection = 'Mystery';
