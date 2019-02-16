@@ -278,7 +278,6 @@ async function textPdfDetection(filename) {
   const [operation] = await vision.asyncBatchAnnotateFiles(request);
   try {
     const [filesResponse] = await operation.promise();
-    console.log(JSON.stringify(filesResponse))  ;
     const destinationUri = filesResponse.responses[0].outputConfig.gcsDestination.uri;
     // await storage.bucket(CLOUD_BUCKET).file(filename).makePublic();
     return prefix;

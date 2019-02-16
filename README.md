@@ -139,11 +139,19 @@ query {
 }
 ```
 
-### Deploying to Google Cloud
+### Building and Deploying to Google Cloud
+```
+yarn build:prod
+```
+
 ```
 source ~/.bashrc
 ```
 
 ```
 gcloud app deploy app.yaml
+```
+
+```
+gcloud app logs tail
 ```
