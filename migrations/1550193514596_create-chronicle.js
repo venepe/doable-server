@@ -8,7 +8,7 @@ exports.up = (pgm) => {
    id: 'id',
    hash: { type: 'varchar' },
    pdf_uri: { type: 'varchar' },
-   thumbnail_uri: { type: 'varchar' },
+   thumbnail_prefix: { type: 'varchar' },
    ocr_uri: { type: 'varchar' },
    created_at: {
      type: 'timestamp',
@@ -22,5 +22,6 @@ exports.up = (pgm) => {
 };
 
 exports.down = (pgm) => {
-
+  pgm.dropTable({schema: 'chronicle', name: 'document'});
+  pgm.dropSchema('chronicle');
 };

@@ -42,9 +42,13 @@ function getPublicUrl(filename) {
   return `https://storage.googleapis.com/${CLOUD_BUCKET}/${filename}`;
 }
 
-function insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri }) {
-  const insert = 'INSERT INTO chronicle.document(hash, pdf_uri, thumbnail_uri, ocr_uri) VALUES($1, $2, $3, $4) RETURNING *';
-  return pool.query({ text: insert, values: [ hash, pdfUri, thumbnailUri, ocrUri ] });
+function getPublicThumbnailUrl({ prefix, index }) {
+  return getPublicUrl(`${prefix}/thumbnails/${index}/${prefix}.jpg`);
+}
+
+function insertIntoChronicle({ pool, hash, pdfUri, thumbnailPrefix, ocrUri }) {
+  const insert = 'INSERT INTO chronicle.document(hash, pdf_uri, thumbnail_prefix, ocr_uri) VALUES($1, $2, $3, $4) RETURNING *';
+  return pool.query({ text: insert, values: [ hash, pdfUri, thumbnailPrefix, ocrUri ] });
 }
 
 function selectHashFromChronicle({ pool, hash }) {
@@ -67,9 +71,9 @@ function sendUploadToGCS (req, res, next) {
 
   selectHashFromChronicle({ pool, hash }).then((result) => {
     if (result && result.rows && result.rows.length > 0) {
-      const { pdf_uri, thumbnail_uri, ocr_uri } = result.rows[0];
+      const { pdf_uri, thumbnail_prefix, ocr_uri } = result.rows[0];
       req.file.cloudStoragePDFPublicUrl = getPublicUrl(pdf_uri);
-      req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(thumbnail_uri);
+      req.file.cloudStorageThumbnailPrefix = thumbnail_prefix;
       storage.bucket(CLOUD_BUCKET).file(ocr_uri).download()
       .then((data) => { return data.toString('utf-8') })
       .then((data) => { return JSON.parse(data) })
@@ -124,18 +128,18 @@ function sendUploadToGCS (req, res, next) {
           })
           .then(() => {
             let gcsname = req.file.cloudStoragePDFObject;
-            return convertPDFToThumbnail(getPublicUrl(gcsname), originalname)
+            return convertPDFToThumbnail(gcsname)
           })
-          .then((gcsname) => {
+          .then(({ prefix }) => {
             req.file.cloudStorageThumbnailObject = gcsname;
-            req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(gcsname);
+            req.file.cloudStorageThumbnailPrefix = prefix;
           })
           .then(() => {
             let pdfUri = req.file.cloudStoragePDFObject;
-            let thumbnailUri = req.file.cloudStorageThumbnailObject;
+            let thumbnailPrefix = req.file.cloudStorageThumbnailPrefix;
             let ocrUri = req.file.cloudStorageOCRObject;
             let gcsname = req.file.cloudStorageObject;
-            return insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri });
+            return insertIntoChronicle({ pool, hash, pdfUri, thumbnailPrefix, ocrUri });
           })
           .then(() => {
             next();
@@ -150,88 +154,53 @@ function sendUploadToGCS (req, res, next) {
     });
 }
 
-function convertDocumentToPDF(uri, originalName) {
+function uploadPdfThumbnail(uri, gcsname) {
   return new Promise((resolve, reject) => {
-    convertApi
-      .convert('pdf', { File: uri })
-      .then((result) => {
-        let newName = originalName.replace(/\.[^/.]+$/, '')
-        const gcsname = Date.now() + newName + '.pdf';
-        const file = bucket.file(gcsname);
-        const mimetype = 'application/pdf';
+    const file = bucket.file(gcsname);
+    const mimetype = 'image/jpeg';
 
-        const stream = file.createWriteStream({
-          resumable: false,
-          metadata: {
-            cacheControl: 'public, max-age=31536000',
-            contentType: mimetype,
-          },
-          predefinedAcl: 'publicRead',
-        });
-
-        stream.on('error', (err) => {
-          console.log(err);
-          console.log('did error');
-          reject();
-        });
-
-        stream.on('finish', () => {
-          resolve(gcsname);
-        });
-
-        request(result.file.url).pipe(stream);
-
-      });
-  });
-}
-
-function convertPDFToThumbnail(uri, originalName) {
-  return new Promise((resolve, reject) => {
-    convertApi
-      .convert('thumbnail', { File: uri }, 'pdf')
-      .then((result) => {
-        let newName = originalName.replace(/\.[^/.]+$/, '')
-        const gcsname = Date.now() + newName + '.jpg';
-        const file = bucket.file(gcsname);
-        const mimetype = 'image/jpeg';
-
-        const stream = file.createWriteStream({
-          resumable: false,
-          metadata: {
-            cacheControl: 'public, max-age=31536000',
-            contentType: mimetype,
-          },
-          predefinedAcl: 'publicRead',
-        });
-
-        stream.on('error', (err) => {
-          console.log(err);
-          console.log('did error');
-          reject();
-        });
-
-        stream.on('finish', () => {
-          resolve(gcsname);
-        });
-
-        request(result.file.url).pipe(stream);
-
-      });
-  });
-}
-
-function textDetection(filename) {
-  const gsUri = getGCUri(filename);
-  return vision.documentTextDetection(gsUri)
-    .then(([result]) => {
-      const fullTextAnnotation = result.fullTextAnnotation;
-      if (fullTextAnnotation && fullTextAnnotation.text) {
-        let text = fullTextAnnotation.text.replace(/\s/g, ' ');
-        return text;
-      } else {
-        throw new Error(ERROR_REASON.NO_TEXT_DETECTED);
-      }
+    const stream = file.createWriteStream({
+      resumable: false,
+      metadata: {
+        cacheControl: 'public, max-age=31536000',
+        contentType: mimetype,
+      },
+      predefinedAcl: 'publicRead',
     });
+
+    stream.on('error', (err) => {
+      console.log(err);
+      console.log('did error');
+      reject();
+    });
+
+    stream.on('finish', () => {
+      console.log(gcsname);
+      resolve(gcsname);
+    });
+
+    request(uri).pipe(stream);
+  });
+}
+
+function convertPDFToThumbnail(gcsname) {
+  return new Promise((resolve, reject) => {
+    let uri = getPublicUrl(gcsname);
+    let prefix = gcsname.replace(/\.[^/.]+$/, '');
+    convertApi
+      .convert('jpg', { File: uri }, 'pdf')
+      .then((result) => {
+        let gcsUploads = result.files.map(({ fileInfo }, index) => {
+          let uri = fileInfo.Url;
+          let thumbnailGcsname = `${prefix}/thumbnails/${index}/${prefix}.jpg`;
+          return uploadPdfThumbnail(uri, thumbnailGcsname);
+        });
+        return Promise.all(gcsUploads);
+      })
+      .then((results) => {
+        resolve({ results, prefix });
+      });
+  });
 }
 
 async function textPdfDetection(filename) {
@@ -273,21 +242,9 @@ async function textPdfDetection(filename) {
   }
 }
 
-function objectDetection(filename) {
-  const gsUri = getGCUri(filename);
-  return vision.objectLocalization(gsUri)
-    .then(([result]) => {
-      let objectDetection = 'Mystery';
-      const objects = result.localizedObjectAnnotations;
-      if (objects && objects.length > 0) {
-        objectDetection = objects[0].name;
-      }
-      return objectDetection;
-    })
-}
-
 module.exports = {
   getPublicUrl,
+  getPublicThumbnailUrl,
   sendUploadToGCS,
   multer
 };

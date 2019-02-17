@@ -77,9 +77,9 @@ Document.sendUploadToGCS,
 
   // Was an image uploaded? If so, we'll use its public URL
   // in cloud storage.
-  if (!req.objectDetection && req.file && req.file.cloudStorageThumbnailPublicUrl) {
+  if (req.file && req.file.cloudStorageThumbnailPrefix) {
     const title = req.file.originalname;
-    const imageUri = req.file.cloudStorageThumbnailPublicUrl;
+    const imagePrefix = req.file.cloudStorageThumbnailPrefix;
     if (req.textDetections) {
       const textDetections = req.textDetections;
       const insert = 'INSERT INTO doable.deck(user_uid, title) VALUES($1, $2) RETURNING *';
@@ -94,7 +94,8 @@ Document.sendUploadToGCS,
             id,
           };
           let formattedDocuments = [];
-          textDetections.forEach((text) => {
+          textDetections.forEach((text, index) => {
+            let imageUri = Document.getPublicThumbnailUrl({ prefix: imagePrefix, index });
             formattedDocuments.push([ userUid, deck.id, imageUri, text ]);
           });
           let query = format('INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES %L RETURNING *', formattedDocuments);
@@ -120,7 +121,7 @@ Document.sendUploadToGCS,
         .catch(e => console.error(e.stack));
     }
   } else {
-    let message = `No Text. Just a ${req.objectDetection}.`;
+    let message = `No Text. It's a mystery.`;
     res.status(400).json({
       message,
     });
