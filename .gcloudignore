@@ -20,5 +20,6 @@ db-data
 node_modules/
 
 secrets/doable-storage-sa.json
+secrets/doable-batch.json
 
 package-lock.json

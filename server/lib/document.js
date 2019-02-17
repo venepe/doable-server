@@ -59,6 +59,10 @@ function sendUploadToGCS (req, res, next) {
   const pool = req.pool;
   const { buffer, originalname, mimetype } = req.file;
 
+  if (!mimetype.match('application/pdf')) {
+    return next();
+  }
+
   let hash = md5(buffer);
 
   selectHashFromChronicle({ pool, hash }).then((result) => {
@@ -97,70 +101,53 @@ function sendUploadToGCS (req, res, next) {
       });
 
       stream.on('finish', () => {
-        if (mimetype.match('image.*')) {
-          textDetection(gcsname).then((textDetection) => {
-            req.file.cloudStorageObject = gcsname;
-            req.file.cloudStoragePublicUrl = getPublicUrl(gcsname);
-            req.textDetection = textDetection;
+        req.file.cloudStoragePDFObject = gcsname;
+        req.file.cloudStoragePDFPublicUrl = getPublicUrl(gcsname);
+
+        textPdfDetection(gcsname)
+          .then((prefix) => {
+            return storage.bucket(CLOUD_BUCKET).getFiles({ prefix: `${prefix}/` })
+          })
+          .then(([files]) => {
+            req.file.cloudStorageOCRObject = files[0].name;
+            return storage.bucket(CLOUD_BUCKET).file(files[0].name).download()
+          })
+          .then((data) => { return data.toString('utf-8') })
+          .then((data) => { return JSON.parse(data) })
+          .then((data) => {
+            let textDetections = [];
+            data.responses.forEach(response => {
+              let text = response.fullTextAnnotation.text.replace(/\s/g, ' ');
+              textDetections.push(text)
+            });
+            req.textDetections = textDetections;
+          })
+          .then(() => {
+            let gcsname = req.file.cloudStoragePDFObject;
+            return convertPDFToThumbnail(getPublicUrl(gcsname), originalname)
+          })
+          .then((gcsname) => {
+            req.file.cloudStorageThumbnailObject = gcsname;
+            req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(gcsname);
+          })
+          .then(() => {
+            let pdfUri = req.file.cloudStoragePDFObject;
+            let thumbnailUri = req.file.cloudStorageThumbnailObject;
+            let ocrUri = req.file.cloudStorageOCRObject;
+            let gcsname = req.file.cloudStorageObject;
+            return insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri });
+          })
+          .then(() => {
             next();
           })
           .catch((err) => {
-            objectDetection(gcsname).then((objectDetection) => {
-              req.objectDetection = objectDetection;
-              next(err);
-            });
+            next(err);
           });
-        } else {
-          convertDocumentToPDF(getPublicUrl(gcsname), originalname)
-            .then((gcsname) => {
-              req.file.cloudStoragePDFObject = gcsname;
-              req.file.cloudStoragePDFPublicUrl = getPublicUrl(gcsname);
-              return textPdfDetection(gcsname);
-            })
-            .then((prefix) => {
-              return storage.bucket(CLOUD_BUCKET).getFiles({ prefix: `${prefix}/` })
-            })
-            .then(([files]) => {
-              req.file.cloudStorageOCRObject = files[0].name;
-              return storage.bucket(CLOUD_BUCKET).file(files[0].name).download()
-            })
-            .then((data) => { return data.toString('utf-8') })
-            .then((data) => { return JSON.parse(data) })
-            .then((data) => {
-              let textDetections = [];
-              data.responses.forEach(response => {
-                let text = response.fullTextAnnotation.text.replace(/\s/g, ' ');
-                textDetections.push(text)
-              });
-              req.textDetections = textDetections;
-            })
-            .then(() => {
-              let gcsname = req.file.cloudStoragePDFObject;
-              return convertPDFToThumbnail(getPublicUrl(gcsname), originalname)
-            })
-            .then((gcsname) => {
-              req.file.cloudStorageThumbnailObject = gcsname;
-              req.file.cloudStorageThumbnailPublicUrl = getPublicUrl(gcsname);
-            })
-            .then(() => {
-              let pdfUri = req.file.cloudStoragePDFObject;
-              let thumbnailUri = req.file.cloudStorageThumbnailObject;
-              let ocrUri = req.file.cloudStorageOCRObject;
-              let gcsname = req.file.cloudStorageObject;
-              return insertIntoChronicle({ pool, hash, pdfUri, thumbnailUri, ocrUri });
-            })
-            .then(() => {
-              next();
-            })
-            .catch((err) => {
-              next(err);
-            });
-        }
-      });
+        });
 
-      stream.end(buffer);
-    }
-  });
+        stream.end(buffer);
+      }
+    });
 }
 
 function convertDocumentToPDF(uri, originalName) {

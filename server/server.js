@@ -133,17 +133,20 @@ Document.sendUploadToGCS,
 (req, res) => {
   let { deckId, userUid } = req.body;
 
-  // Was an image uploaded? If so, we'll use its public URL
-  // in cloud storage.
-  if (!req.objectDetection && req.file && req.file.cloudStoragePublicUrl) {
-    const imageUri = req.file.cloudStoragePublicUrl;
-    if (req.textDetection) {
-      const text = req.textDetection;
-      const insert = 'INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES($1, $2, $3, $4) RETURNING *';
+  if (!req.objectDetection && req.file && req.file.cloudStorageThumbnailPublicUrl) {
+    const imageUri = req.file.cloudStorageThumbnailPublicUrl;
+    const textDetections = req.textDetections;
+    let formattedDocuments = [];
+    textDetections.forEach((text) => {
+      formattedDocuments.push([ userUid, deckId, imageUri, text ]);
+    });
+    let query = format('INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES %L RETURNING *', formattedDocuments);
 
-      pool.query({ text: insert, values: [ userUid, deckId, imageUri, text ] })
-        .then((result) => {
-          const { id, user_uid, deck_id, image_uri, text, created_at } = result.rows[0];
+    pool.query(query)
+      .then((result) => {
+        let documents = [];
+        result.rows.forEach((row) => {
+          const { id, user_uid, deck_id, image_uri, text, created_at } = row;
           const document = {
             userUid: user_uid,
             deckId: deck_id,
@@ -152,36 +155,11 @@ Document.sendUploadToGCS,
             text,
             id,
           };
-          res.json({ document });
-        })
-        .catch(e => console.error(e.stack));
-    } else if (req.textDetections) {
-      const textDetections = req.textDetections;
-      let formattedDocuments = [];
-      textDetections.forEach((text) => {
-        formattedDocuments.push([ userUid, deckId, imageUri, text ]);
-      });
-      let query = format('INSERT INTO doable.document(user_uid, deck_id, image_uri, text) VALUES %L RETURNING *', formattedDocuments);
-
-      pool.query(query)
-        .then((result) => {
-          let documents = [];
-          result.rows.forEach((row) => {
-            const { id, user_uid, deck_id, image_uri, text, created_at } = row;
-            const document = {
-              userUid: user_uid,
-              deckId: deck_id,
-              imageUri: image_uri,
-              createdAt: created_at,
-              text,
-              id,
-            };
-            documents.push(document);
-          });
-          res.json({ documents });
-        })
-        .catch(e => console.error(e.stack));
-    }
+          documents.push(document);
+        });
+        res.json({ documents });
+      })
+      .catch(e => console.error(e.stack));
   } else {
     let message = `No Text. Just a ${req.objectDetection}.`;
     res.status(400).json({
