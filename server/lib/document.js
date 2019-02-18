@@ -12,6 +12,7 @@ const SECRETS_DIR = path.join(__dirname, '../../', 'secrets');
 const ERROR_REASON = {
   NO_TEXT_DETECTED: 'NO_TEXT_DETECTED',
 };
+const PDF_PAGE_LIMIT = 100;
 
 const storage = new Storage({
   projectId: 'doable',
@@ -108,7 +109,12 @@ function sendUploadToGCS (req, res, next) {
         req.file.cloudStoragePDFObject = gcsname;
         req.file.cloudStoragePDFPublicUrl = getPublicUrl(gcsname);
 
-        textPdfDetection(gcsname)
+        convertPDFToThumbnail(gcsname)
+          .then(({ prefix }) => {
+            req.file.cloudStorageThumbnailObject = gcsname;
+            req.file.cloudStorageThumbnailPrefix = prefix;
+            return textPdfDetection(gcsname);
+          })
           .then((prefix) => {
             return storage.bucket(CLOUD_BUCKET).getFiles({ prefix: `${prefix}/` })
           })
@@ -128,11 +134,6 @@ function sendUploadToGCS (req, res, next) {
           })
           .then(() => {
             let gcsname = req.file.cloudStoragePDFObject;
-            return convertPDFToThumbnail(gcsname)
-          })
-          .then(({ prefix }) => {
-            req.file.cloudStorageThumbnailObject = gcsname;
-            req.file.cloudStorageThumbnailPrefix = prefix;
           })
           .then(() => {
             let pdfUri = req.file.cloudStoragePDFObject;
@@ -145,6 +146,7 @@ function sendUploadToGCS (req, res, next) {
             next();
           })
           .catch((err) => {
+            req.errorMessage = err;
             next(err);
           });
         });
@@ -170,7 +172,6 @@ function uploadPdfThumbnail(uri, gcsname) {
 
     stream.on('error', (err) => {
       console.log(err);
-      console.log('did error');
       reject();
     });
 
@@ -190,6 +191,11 @@ function convertPDFToThumbnail(gcsname) {
     convertApi
       .convert('jpg', { File: uri }, 'pdf')
       .then((result) => {
+        if (result.files.length > PDF_PAGE_LIMIT) {
+          reject(`Number of pages limited to ${PDF_PAGE_LIMIT}`);
+          return;
+        }
+
         let gcsUploads = result.files.map(({ fileInfo }, index) => {
           let uri = fileInfo.Url;
           let thumbnailGcsname = `${prefix}/thumbnails/${index}/${prefix}.jpg`;
@@ -219,7 +225,7 @@ async function textPdfDetection(filename) {
     gcsDestination: {
       uri: gcsDestinationUri,
     },
-    batchSize: 100,
+    batchSize: PDF_PAGE_LIMIT,
   };
   const features = [{type: 'DOCUMENT_TEXT_DETECTION'}];
   const request = {
